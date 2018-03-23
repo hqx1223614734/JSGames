@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<head lang="en">
+  <meta charset="UTF-8">
+	<meta name="Generator" content="EditPlus®">
+	<meta name="Author" content="辣手摧花">
+	<meta name="Keywords" content="">
+	<meta name="Description" content="">
+	<title>CRAMSNAKE</title>
+	<style>
+		body,ul{margin:0;padding:0}
+		body{
+			background-color:black;
+		}
+		ul{list-style:none}
+		ul{
+			width:440px;
+			height:440px;
+			margin:50px auto;
+			background-color:rgba(255,255,255,.5);
+			overflow:hidden;
+		}
+		li{/*每个格子的样式*/
+			float:left;
+			width:20px;
+			height:20px;
+			border:1px solid rgba(0,0,0,.5);
+		}
+		li.item{/*蛇身颜色*/
+			background-color:red;
+		}
+		li.food{/*food颜色*/
+			background-color:yellow;
+		}
+		.bg, .btn, .failed{
+			position:absolute;
+			display:block;
+			overflow:hidden;
+			left:0;
+			right:0;
+			width:440px;
+			height:440px;
+			margin:auto;
+			transition:.5s;
+		}
+		.btn{
+			background-color:rgba(0,0,0,.7);
+			z-index:2;
+		}
+		.failed{/*失败下落框*/
+			color:green;
+			top:50px;
+			text-align:center;
+			line-height:440px;
+			font-size:40px;
+			font-weight:bold;
+			transition:.5s;
+			opacity:0;
+			z-index:1;
+		}
+		button{/*模式按钮*/
+			display:block;
+			width:200px;
+			height:40px;
+			margin:auto;
+			font-family:'Microsoft YaHei';
+			font-size:20px;
+			font-weight:bold;
+			cursor:pointer;
+		}
+		.btn1{
+			margin-top:150px;
+		}
+		.btn2{
+			margin-top:50px;
+		}
+		.score{
+			width:300px;
+		}
+		.score, .resetBox{
+			position:absolute;
+			left:11%;
+			top:110px;
+			font-family:'Microsoft YaHei';
+			font-size:40px;
+			font-weight:bold;
+			color:white;
+		}
+		.resetBox{/*restart按钮*/
+			top:230px;
+			right:210px;
+			width:200px;
+			color:#888;
+			cursor:pointer;
+		}
+	</style>
+</head>
+<body>
+		<div class="score">SCORE: <span class="num">0</span></div>
+		<div class="resetBox"><button class="reset">RESTART</button></div>
+		<div class="bg">
+			<div class="btn">
+				<button class="btn1">COMMEN</button>
+				<button class="btn2">CRAZY</button>
+			</div>
+		</div>
+		<ul class="box"></ul>
+		<div class="failed">GAME OVER</div>
+  <script>
+		var box = document.getElementsByClassName("box")[0];
+		var num = document.getElementsByClassName("num")[0];
+		var btnStart1 = document.getElementsByClassName("btn1")[0];
+		var btnStart2 = document.getElementsByClassName("btn2")[0];
+		var reset = document.getElementsByClassName("reset")[0];
+		var btn = document.getElementsByClassName("btn")[0];
+		var failed = document.getElementsByClassName("failed")[0];
+		var cells;//每个格子
+		var score;//分数的基数
+		var direction;//初始方向
+		var speed;//初始速度,越小速度越大
+		var speedCrazy;//初始速度,越小速度越大
+		var timer;//定时器
+		var snake;//初始蛇的位置和长度
+		var food;//食物的初始位置
+		//开始按钮添加事件
+		btnStart1.addEventListener("click",function(){
+			//render();
+			btn.style.left = "-880px";
+			createInterval(speed);
+		});
+		btnStart2.addEventListener("click",function(){
+			//createInterval();
+			btn.style.left = "-880px";
+			createInterval(speedCrazy);
+		});
+		//restart按钮添加事件
+		reset.onclick = function(){
+			clearInterval(timer);
+			init();
+			num.innerHTML = "0";
+			failed.style.opacity = "0";
+			btn.style.left = "0px";
+		};
+		//绑定键盘事件
+		document.addEventListener("keydown", keyDown);
+
+		init();//初始化条件
+		
+		//函数部分
+		//初始状态
+		function init(){
+			score = 10;//分数的基数
+			direction = "L";//初始方向
+			speed = 1000;//初始速度,越小速度越大
+			speedCrazy = 1000;//初始速度,越小速度越大
+			timer = 0;//定时器
+			snake = [[9, 9], [9, 10], [9, 11]];//初始蛇的位置和长度
+			food = [15, 15];//食物的初始位置
+			cells = createSurface();
+		}
+		//建立界面
+		function createSurface(){
+			box.innerHTML = "";
+			for(var i = 0; i < 20; i++){
+				for(var j = 0; j < 20; j++){
+					if(isInArray(snake, [i, j])){
+						box.innerHTML += "<li class='item'></li>";
+					}else if(food[0] == i && food[1] == j){
+						box.innerHTML += "<li class='food'></li>";
+					}else{
+						box.innerHTML += "<li></li>";
+					}
+				}
+			}
+			return box.children;
+		}
+		//创建定时器
+		function createInterval(speed){
+			timer = setInterval(function(){
+				move();
+			}, speed);
+		}
+		//碰撞函数
+		function isCollision(){
+			var x = snake[0][0];
+			var y = snake[0][1];
+			//判断是否碰撞边界
+			if(x < 0 || x > 19 || y < 0 || y > 19){
+				clearInterval(timer);
+				return true;
+			}
+			//判断是否碰撞自身
+			snake.shift();
+			if(isInArray(snake, [x, y])){
+				clearInterval(timer);
+				return true;
+			}else{
+				snake.unshift([x, y]);
+			}
+			//判断是否碰撞食物
+			if(snake[0][0] == food[0] && snake[0][1] == food[1]){
+				lengthChange();
+				randomFood();
+				changeScore();
+				if(speed >= 500){
+					speed -= 50;
+				}
+				if(speedCrazy >= 200){
+					speedCrazy -= 100;
+				}
+				if(score <= 150){
+					score += 15;
+				}
+				clearInterval(timer);
+				createInterval(speedCrazy);
+			}
+			return false;
+		}
+		//运动函数
+		function move(){
+			//snake.pop();
+			var x = snake[0][0];
+			var y = snake[0][1];
+			switch(direction){
+				case "L":
+					y --;
+					break;
+				case "R":
+					y ++;
+					break;
+				case "T":
+					x --;
+					break;
+				case "B":
+					x ++;
+					break;
+			}
+			snake.unshift([x, y]);
+			if(!isCollision()){
+				fillHtml([x, y], snake.pop());
+				return true;
+			}
+			failed.style.opacity = "1";
+			return false;
+		}
+		//绘制snake的移动
+		function fillHtml(head, tail){
+			//console.log(head[0] + " " + head[1] + " " + tail[0] + " " + tail[1])
+			var first = head[0] * 20 + head[1];
+			var last = tail[0] * 20 + tail[1];
+			cells[first].className = "item";
+			cells[last].className = "";
+		}
+		//键盘事件
+		function keyDown(e){
+			var event = e || window.event;
+			switch(event.keyCode){
+				case 37:
+					direction = direction == "R" ? "R" : "L";
+					break;
+				case 38:
+					direction = direction == "B" ? "B" : "T";
+					break;
+				case 39:
+					direction = direction == "L" ? "L" : "R";
+					break;
+				case 40:
+					direction = direction == "T" ? "T" : "B";
+					break;
+			}
+		}
+		//判断二维数组是否存在某一维数组
+		function isInArray(arr, value){
+			for(var i = 0; i < arr.length; i++){
+				if(arr[i][0] == value[0] && arr[i][1] == value[1]){
+					return true;
+				}
+			}
+			return false;
+		}
+		//产生不在蛇身上的食物,
+		function randomFood(){
+			var x = Math.floor(Math.random()*20);
+			var y = Math.floor(Math.random()*20);
+			while(isInArray(snake, [x, y])){
+				x = Math.floor(Math.random()*20);
+				y = Math.floor(Math.random()*20);
+			}
+			food[0] = x;
+			food[1] = y;
+			var pos = food[0] * 20 + food[1];
+			cells[pos].className = "food";
+		}
+		//计算长度加1的位置
+		function lengthChange(){
+			var len = snake.length;
+			var last1 = snake[len - 1];
+			var last2 = snake[len - 2];
+			if(last1[1] == last2[1]){
+				snake.push([last1[0] + last1[0] - last2[0], last1[1]]);
+			}else if(last1[0] == last2[0]){
+				snake.push([last1[0], last1[1] + last1[1] - last2[1]]);
+			}
+		}
+		//改变分数
+		function changeScore(){
+			var number = parseInt(num.innerHTML);
+			number += score;
+			num.innerHTML = number;
+		}
+		/*
+		//递归 调用requestAnimationFrame方法实现,函数不稳定,弃用
+		function render(){
+			if(move()){
+				createTimeout();
+			}else{
+				window.cancelAnimationFrame(timer);
+			}
+		}
+		//window.requestAnimationFrame(render);
+		function createTimeout(){
+			window.cancelAnimationFrame(timer);
+			timer = setTimeout(function(){
+				console.log(1)
+				window.requestAnimationFrame(render);
+				
+			}, speedCrazy);
+		}
+		*/
+  </script>
+</body>
+</html>
