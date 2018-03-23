@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<head lang="en">
+  <meta charset="UTF-8">
+  <title>clearBomb</title>
+  <style>
+	body,ul{margin:0;padding:0}
+	ul{list-style:none}
+	.box{/*整体方框*/
+		width:250px;
+		height:250px;
+		margin:50px auto;
+	}
+	li{/*没一个格子*/
+		position:relative;
+		float:left;
+		width:19px;
+		height:19px;
+		border:3px solid;
+		border-top-color:#c8c8c8;
+		border-left-color:#c8c8c8;
+		border-right-color:#6b6b6b;
+		border-bottom-color:#6b6b6b;
+		text-align:center;
+		line-height:19px;
+		font-size:6px;
+		color:#888;
+	}
+	.mask::after{/*没有点击的格子*/
+		content:'';
+		position:absolute;
+		width:19px;
+		height:19px;
+		top:0;
+		left:0;
+		background-color:#a1a1a1;
+	}
+	.bomb::after{/*是bomb显示的内容*/
+		content:'';
+		position:absolute;
+		width:19px;
+		height:19px;
+		top:0;
+		left:0;
+		background-color:red;
+	}
+	.clear{/*被点击后的格子*/
+		background-color:white;
+	}
+	.fall{/*结束框样式*/
+		position:absolute;
+		display:none;
+		left:0;
+		right:0;
+		top:50px;
+		width:250px;
+		height:170px;
+		margin:auto;
+		padding-top:80px;
+		background-color:rgba(146,146,146,.7);
+		font-size:30px;
+		color:#00ff66;
+		text-align:center;
+		line-height:50px;
+		z-index:1;
+	}
+	.fall p{
+		width:100%;
+		height:30px;
+		border:1px solid;
+	}
+	.fall p:nth-child(1){
+		margin-top:20px;
+	}
+	.flag::after{/*插红旗标志*/
+		content:'⚑';
+		position:absolute;
+		width:19px;
+		height:19px;
+		top:0;
+		left:0;
+		color:red;
+		font-size:16px;
+		text-align:center;
+		line-height:19px;
+		background-color:#a1a1a1;
+	}
+	.reset{/*重置*/
+		position:absolute;
+		top:60px;
+		right:29%;
+		width:100px;
+		height:50px;
+		
+	}
+	button{
+		width:100px;
+		height:50px;	
+		color:#888;
+		font-size:20px;
+		font-family:'Microsoft YaHei';
+		cursor:pointer;
+	}
+	.level{
+		position:absolute;
+		top:50px;
+		right:20%;
+		font-size:20px;
+		font-family:'Microsoft YaHei';
+	}
+  </style>
+</head>
+<body>
+	<div class="level">
+		DIFFICULTY: <input type="range" name="level" min="1" max="99" value="10">
+	</div>
+	<div class="reset"><button class="reset">RESTART</button></div>
+	<div class="fall">
+		<p class="title"></p>
+		<p class="usetime"></p>
+	</div>
+  <ul class="box">
+  </ul>
+  <script>
+        var box = document.getElementsByTagName("ul")[0];
+		var fall = document.getElementsByClassName("fall")[0];
+		var reset = document.getElementsByClassName("reset")[0];
+		var level = document.getElementsByName("level")[0];
+		var bombNum;//雷的个数
+		var bomb;//雷的数组
+		var chessboard;//棋盘
+		var oldTime;//耗时
+		document.oncontextmenu = function(e){//取消页面自动事件
+			e.preventDefault();
+		}
+		reset.addEventListener("click", function(){//reset按钮绑定restart事件
+			box.innerHTML = "";
+			init();
+			fall.style.display = "none";
+		});
+		box.addEventListener("mousedown", click);//box绑定鼠标点击事件
+		//初始化
+		init();
+		
+		//函数部分
+		//初始化函数
+		function init(){
+			bombNum = level.value;
+			bomb = [];//雷的数组
+			chessboard = [];//棋盘
+			oldTime = new Date();
+			produceBomb();
+			produceBoard();
+		}
+		//click鼠标点击函数
+		function click(e){
+			var target = e.target;
+			className = target.className;
+			var x = parseInt(target.getAttribute('dataX'));
+			var y = parseInt(target.getAttribute('dataY'));
+			if(e.button == 0 && className != "flag"){
+				//判断是否结束游戏
+				if(isInArray(bomb, [x, y])){
+					gameOver();
+					target.className = "bomb";
+					return;
+				}
+				//如果没有,进行扩散
+				spread(x, y);
+				//判断是否完成
+				success();
+			}else if(e.button == 2 && className != "clear"){
+				target.className = className == "mask" ? "flag" : "mask"; 
+			}
+		}
+		//生成雷函数
+		function produceBomb(){
+			for(var i = 0; i < bombNum; i++){
+				var x = 1 + Math.floor(10*Math.random());
+				var y = 1 + Math.floor(10*Math.random());
+				while(isInArray(bomb, [x, y])){
+					x = 1 + Math.floor(10*Math.random());
+					y = 1 + Math.floor(10*Math.random());
+				}
+				bomb.push([x, y]);
+			}
+		}
+		//生成棋盘
+		function produceBoard(){
+			//用二维数组存储棋盘
+			for(var i = 0; i < 12; i++){
+				chessboard[i] = [];
+				for(var j = 0; j < 12; j++){
+					chessboard[i][j] = 0;
+				}
+			}
+			//bomb周边bomb数量加一
+			for(var i = 0; i < bombNum; i++){
+				var x = bomb[i][0];
+				var y = bomb[i][1];
+				chessboard[x - 1][y] ++;//上
+				chessboard[x + 1][y] ++;//下
+				chessboard[x][y - 1] ++;//左
+				chessboard[x][y + 1] ++;//右
+				chessboard[x - 1][y - 1] ++;//左上
+				chessboard[x - 1][y + 1] ++;//右上
+				chessboard[x + 1][y - 1] ++;//左下
+				chessboard[x + 1][y + 1] ++;//右下
+			}
+			
+			for(var i = 1; i < 11; i++){
+				for(var j = 1; j < 11; j++){
+					box.innerHTML += "<li dataX="+i+" dataY="+j+" class='mask'>" + (chessboard[i][j]? chessboard[i][j] : "") + "</li>";
+				}
+			}
+		}
+		//自动扩散,递归实现
+		function spread(x, y){
+			if(x < 1 || x > 10 || y < 1 || y > 10){
+				return;
+			}
+			var all = box.children;
+			//如果已经被点击过,则返回
+			if(all[(x - 1)*10 + y - 1].className == "clear"){
+				return;
+			}
+			//否则改为clear类名,表示点击过
+			all[(x - 1)*10 + y - 1].className = "clear";
+			if(chessboard[x][y] == 0){
+				spread(x - 1,y);//上
+				spread(x + 1,y);//下
+				spread(x,y - 1);//左
+				spread(x,y + 1);//右
+				spread(x - 1,y - 1);//左上
+				spread(x - 1,y + 1);//右上
+				spread(x + 1,y - 1);//左下
+				spread(x + 1,y + 1);//右下
+			}
+		}
+		//gameOver函数
+		function gameOver(){
+			var allChilds = box.children;
+			var len = allChilds.length;
+			var time = Math.floor(new Date() - oldTime)/1000;
+			//把所有的bomb显示出来
+			for(var i = 0; i < len; i++){
+				var x = parseInt(allChilds[i].getAttribute('dataX'));
+				var y = parseInt(allChilds[i].getAttribute('dataY'));
+				if(isInArray(bomb, [x, y])){
+					allChilds[i].className = "bomb";
+				}
+			}
+			//显示用时
+			fall.innerHTML = "GAME OVER <br>USE TIME: "+ time +"s";
+			fall.style.display = "block";
+			fall.style.color = "#ffffff";
+		}
+		//success函数
+		function success(){
+			var all = box.children;
+			var len = all.length;
+			var count = 0;
+			//判断没被点击的数量,如果等于bomb的数量,则显示成功
+			for(var i = 0; i < len; i++){
+				if(all[i].className == "mask" || all[i].className == "flag"){
+					count ++;
+				}
+			}
+			if(count == bombNum){
+				var time = Math.floor(new Date() - oldTime)/1000;
+				fall.innerHTML = "CONGRATULATION <br> USE TIME:"+ time +"s";
+				fall.style.display = "block";
+				fall.style.color = "#0000ff";
+			}
+		}
+		//判断二维数组是否存在某一维数组
+		function isInArray(arr, value){
+			for(var i = 0; i < arr.length; i++){
+				if(arr[i][0] == value[0] && arr[i][1] == value[1]){
+					return true;
+				}
+			}
+			return false;
+		}
+  </script>
+</body>
+</html>
