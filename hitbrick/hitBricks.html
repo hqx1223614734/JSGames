@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<head lang="en">
+  <meta charset="UTF-8">
+  <title>body</title>
+  <style>
+	body,ul{margin:0;padding:0}
+	ul{list-style:none}
+	body{
+		background-color:rgba(0,0,0,.5);
+	}
+	.wrapper{
+		position:relative;
+		width:480px;
+		height:600px;
+		margin:10px auto;
+		border:1px solid red;
+	}
+	.fall{/* 下落弹窗样式 */
+		position:absolute;
+		top:-600px;
+		width:100%;
+		height:100%;
+		background-color:rgba(0,0,0,.5);
+		text-align:center;
+		line-height:500px;
+		transition:.5s;
+	}
+	.restart{/* 重新开始按钮 */
+		position:absolute;
+		left:0;
+		right:0;
+		bottom:100px;
+		width:200px;
+		height:50px;
+		margin:auto;
+		cursor:pointer;
+		z-index:10;
+	}
+	.restart, .fall{
+		font-family:'Microsoft YaHei';
+		font-size:40px;
+		color:#888;
+	}
+	.box{
+		width:100%;
+		height:100px;
+	}
+	li{/* 每一个砖块格子 */
+		float:left;
+		width:20px;
+		height:20px;
+	}
+	.clear{/* 碰撞砖块后的样式 */
+		background-color:transparent !important;
+	}
+	.item0{/* 第一个砖块 */
+		border-top-left-radius:10px;
+		border-bottom-left-radius:10px;
+	}
+	.item1{/* 第二个砖块 */
+
+	}
+	.item2{/* 第三个砖块 */
+		border-top-right-radius:10px;
+		border-bottom-right-radius:10px;
+	}
+	.plank{/* 弹板样式 */
+		position:absolute;
+		bottom:60px;
+		left:0px;
+		height:20px;
+	}
+	.plankItem{/* 弹板格子样式 */
+		border-radius:5px;
+		background-color:#ffff66;
+	}
+	.ball{/* 小球样式 */
+		position:absolute;
+		bottom:300px;
+		left:100px;
+		width:20px;
+		height:20px;
+		border-radius:50%;
+		background-color:red;
+	}
+	.wrapper .lengthgift{/* 长度奖励样式 */
+		position:absolute;
+		top:0;
+		left:0;
+		width:60px;
+		height:20px;
+		border-radius:10px;
+		background-color:red;
+	}
+  </style>
+</head>
+<body>
+	<div class="wrapper">
+	  <ul class="box"></ul><!-- 砖块 -->
+	  <ul class="plank"></ul><!-- 弹板 -->
+	  <div class="ball"></div>
+	  <div class="fall"><span class="gameInfo"></span><button class="restart">RESTART</button></div>
+	  <div class="fall begin">ARE YOU READY?<button class="start">RESTART</button></div>
+	</div>
+	<script src="js/jquery-3.2.1.js"></script>
+	<script>
+		var plank = document.getElementsByClassName("plank")[0];
+		var wrapper = document.getElementsByClassName("wrapper")[0];
+		var box = document.getElementsByClassName("box")[0];
+		var ball = document.getElementsByClassName("ball")[0];
+		var fall = document.getElementsByClassName("fall")[0];
+		var restart = document.getElementsByClassName("restart")[0];
+		var gameInfo = document.getElementsByClassName("gameInfo")[0];
+		var lengthGift = $("<div class='lengthgift'></div>");
+		var width = parseInt(getComputedStyle(wrapper, null)["width"]);
+		var height = parseInt(getComputedStyle(box, null)["height"]);
+		var wrapperHeight = parseInt(getComputedStyle(wrapper, null)["height"]);
+		var maxSpeed;//小球最大速度
+		var cells;//砖块数组
+		var planks;//板子的数组
+		var plankNum;//板子的数量
+		var cellNum;//砖块的个数
+		var speedX;//小球水平的移动速度
+		var speedY;//小球的竖直的移动速度
+		var timer;//小球运动定时器
+		var speed;//定时器的速度
+		var plankChangeTimer;//砖块长度改变定时器
+		var clearNum;//打掉砖块的个数
+		
+		init();//执行初始化函数
+
+		//函数部分
+		//初始化函数
+		function init(){
+			document.addEventListener("keydown", plankMove, false);//绑定全局的键盘事件函数
+			restart.addEventListener("click", restartFunction, false);
+			cellNum = width * height /400;
+			ball.style.bottom = "300px";
+			ball.style.left = "100px";
+			plank.style.left = "0px";
+			maxSpeed = 3;
+			clearNum = 0;
+			plankNum = 3;
+			speedX = -1;
+			speedY = -1;
+			timer = 0;
+			speed = 10;
+			plankChangeTimer = 0;
+			planks = createPlank();//先设置数据,再创建,顺序很重要
+			cells = createCells();
+			changeGiftState("clear");
+			createInterval();
+		}
+
+		//reset函数
+		function restartFunction(){
+			init();
+			fall.style.top = "-600px";
+		}
+		//创建运动函数
+		function createInterval(){
+			timer = setInterval(ballMove, speed);
+		}
+		//创建每个砖块
+		function createCells(){
+			box.innerHTML = "";
+			//产生颜色随机值
+			for(var i = 0; i < cellNum; i++){
+				if(i % 3 == 0){
+					var r = Math.floor(Math.random() * 255);
+					var g = Math.floor(Math.random() * 255);
+					var b = Math.floor(Math.random() * 255);
+				}
+				if(r <= 100){//红色分量小于100的为长度奖励砖块
+					box.innerHTML += "<li class='lengthgiftcell item"+ i%3 +"'style='background-color:rgb("+ r + "," + g +","+ b +")'></li>";
+				}else{
+					box.innerHTML += "<li class='item"+ i%3 +"'style='background-color:rgb("+ r + "," + g +","+ b +")'></li>";
+				}
+			}
+			return box.children;
+		}
+		//创建板子
+		function createPlank(){
+			plank.innerHTML = "";
+			for(var i = 0; i < plankNum; i++){
+				plank.innerHTML += "<li class='plankItem'></li>";
+			}
+			return plank.children;
+		}
+		//板子的移动函数
+		function plankMove(e){
+			var left = parseInt(getComputedStyle(plank, null)["left"]);
+			if(e.keyCode == 37){
+				if(left - 20 >= 0){
+					plank.style.left = left - 20 + "px";
+				}
+			}else if(e.keyCode == 39){
+				if(left + (plankNum * 20 + 20) <= width){
+					plank.style.left = left + 20 + "px";
+				}
+			}
+		}
+		//小球的移动函数
+		function ballMove(){
+			var x = parseInt(getComputedStyle(ball, null)["left"]);
+			var y = parseInt(getComputedStyle(ball, null)["bottom"]);
+			var offsetRight = x + 20 + speedX;
+			var offsetTop = y + 20 + speedY;
+			var offsetBottom = y + speedY;
+			var offsetLeft = x + speedX;
+			//判断是否发生碰撞左右墙壁
+			if(offsetRight >= width || offsetLeft <= 0){
+				speedX = -speedX;
+			}
+			//判断是否碰撞上下墙壁
+			if(offsetBottom <= 0){
+				failed();
+			}
+			if(offsetTop >= 600){
+				speedY = -speedY;
+			}
+			//判断是否碰撞板子
+			if(offsetBottom <= 80 && offsetBottom >= 60){
+				var left = parseInt(getComputedStyle(plank, null)["left"]);
+				var right = left + plankNum * 20;
+				//如果碰撞弹板
+				if(offsetRight > left && offsetLeft < right){
+					speedY = -speedY;//速度取反
+					//如果碰撞弹板中央部分,y轴速度增加
+					if(offsetLeft >= left && offsetRight <= right){
+						if(speedY * speedY >= maxSpeed * maxSpeed){
+							speedY = (speedY > 0 ? 1 : -1);
+						}else{
+							speedY += (speedY > 0 ? 1 : -1);
+						}
+					}else{//否则,x轴速度增加
+						if(speedX * speedX >= maxSpeed * maxSpeed){
+							speedX = (speedX > 0 ? 1 : -1);
+						}else{
+							speedX += (speedX > 0 ? 1 : -1);
+						}
+					}
+				}
+			}
+			//判断是否碰撞砖块
+			if(offsetTop > 600 - height){
+				var row = Math.floor((600 - offsetTop)/20);
+				var col = Math.floor(Math.floor((x + 10)/20)/3)*3;
+				var index = row *24 + col;
+				//如果不包含clear类,说明没有被碰撞过
+				if(!cells[index].classList.contains("clear")){
+					speedY = -speedY;
+					cells[index].classList.add("clear");
+					cells[index + 1].classList.add("clear");
+					cells[index + 2].classList.add("clear");
+					clearNum ++;
+					//如果碰撞数等于砖块格子数,说明已经清除完毕
+					if(clearNum * 3 == cells.length){
+						success();
+					}
+					//判断碰撞砖块是否含有长度奖励类名
+					if(cells[index].classList.contains("lengthgiftcell")){
+						//用jQuery animate函数模拟砖块下落过程
+						lengthGift.clone().appendTo(wrapper).css({
+							'left' : col*20,
+							'top' : row*20,
+							'background-color' : cells[index].style.backgroundColor
+						}).animate({
+							'top' : wrapperHeight - 100
+						}, 5000, 'linear', function(){//下落到弹板所在高度判断是否碰撞
+							var left = parseInt(getComputedStyle(plank, null)["left"]);
+							var right = left + plankNum * 20;
+							var cellLeft = parseInt($(this).css("left"));
+							var cellRight = cellLeft + 60;
+							//如果碰撞则弹板长度加一
+							if(!(cellLeft >= right)&&!(cellRight <= left)){
+								lengthChange(left);
+								$(this).remove();
+							}
+							//否则继续下落
+							$(this).animate({
+								'top' : wrapperHeight - 20
+							}, 1000, 'linear', function(){$(this).remove()});
+						});
+					}
+				}
+			}
+			//改变小球的位置
+			ball.style.left = x + speedX + "px";
+			ball.style.bottom = y + speedY + "px";
+		}
+		//失败函数
+		function failed(){
+			document.removeEventListener("keydown", plankMove, false);
+			changeGiftState("stop");
+			gameInfo.innerHTML = "GAME OVER";
+			gameInfo.style.color = "green";
+			fall.style.top = "0px";
+			clearInterval(timer);
+		}
+		//成功函数
+		function success(){
+			document.removeEventListener("keydown", plankMove, false);
+			gameInfo.innerHTML = "BEAUTIFUL!!!^_^";
+			gameInfo.style.color = "yellow";
+			fall.style.top = "0px";
+			clearInterval(timer);
+		}
+		//改变板子的长度,5s后变会原长度
+		function lengthChange(left){
+			if(plankNum != 5){
+				if(left > width/2){
+					plank.style.left = left - 40 + "px";
+				}
+			}
+			clearTimeout(plankChangeTimer);
+			plankNum = 5;
+			planks = createPlank();
+			plankChangeTimer = setTimeout(function(){
+				plankNum = 3;
+				planks = createPlank();
+			}, 5000);
+		}
+		//改变lengthgift运动函数
+		function changeGiftState(type){
+			var childs = wrapper.children;
+			var len = childs.length;
+			if(type == "stop"){
+				for(var i = 0; i < len; i ++){
+					if(childs[i].classList.contains("lengthgift")){
+						$(childs[i]).stop();
+					}
+				}
+			}
+			if(type == "clear"){
+				for(var i = 0; i < len; i ++){
+					if(childs[i].classList.contains("lengthgift")){
+						$(childs[i]).remove();
+					}
+				}
+			}
+		}
+		//长度改变GIFT,有问题,不采用
+		function LengthGift(x, y, elem){
+			this.x = x;
+			this.y = y;
+			this.timer1 = 0;
+			this.indexTimer = lengthTimer ++;
+			this.color = elem.style.backgroundColor;
+			var gift = lengthGift.cloneNode();
+			this.init = function(){
+				gift.style.top = y + "px";
+				gift.style.left = x + "px";
+				gift.style.backgroundColor = this.color;
+				gift.className = "lengthgift";
+				wrapper.appendChild(gift);
+				this.createInterval();
+			}
+			this.createInterval = function(){
+				arrTimer[this.indexTimer] = setInterval(this.move, 10);
+			}
+			this.move = function(){
+				var top = parseInt(gift.style.top);
+				var offsetBottom = top + 20;
+				var offsetLeft = this.x;
+				var offsetRight = this.x + 60;
+				if(offsetBottom >= wrapperHeight){
+					clearInterval(arrTimer[this.indexTimer]);
+					wrapper.removeChild(gift);
+				}
+				gift.style.top = top + 1 + "px";
+			}
+		}
+	</script>
+</body>
+</html>
